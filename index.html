@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>德拉肯海姆 NPC 档案录</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=EB+Garamond:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --drakken-purple: #2a0a3b;
+            --drakken-glow: #9d4edd;
+            --drakken-green: #39FF14;
+            --drakken-red: #ff3333;
+            --bg-dark: #0a0a0a;
+            --border-gold: #c0a060;
+            --text-gray: #d4d4d4;
+        }
+
+        /* 动画关键帧 */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulseGlow { 0% { text-shadow: 0 0 5px var(--drakken-glow); } 50% { text-shadow: 0 0 15px var(--drakken-glow), 0 0 5px #fff; } 100% { text-shadow: 0 0 5px var(--drakken-glow); } }
+        @keyframes floatUp { 0% { transform: scale(0.95); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes statusPulse { 0% { opacity: 0.7; } 50% { opacity: 1; text-shadow: 0 0 8px var(--drakken-green); } 100% { opacity: 0.7; } }
+        
+        @keyframes urgentPulse {
+            0% { transform: scale(1); box-shadow: 0 0 10px #ff0000; }
+            50% { transform: scale(1.05); box-shadow: 0 0 25px #ff0000, 0 0 10px var(--drakken-red); }
+            100% { transform: scale(1); box-shadow: 0 0 10px #ff0000; }
+        }
+
+        /* 全局盒模型修正，防止宽度计算溢出 */
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-gray);
+            font-family: 'EB Garamond', serif;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-image: url('https://i.ibb.co/KpWZF84G/image.png');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            opacity: 0.25; 
+            z-index: -1;
+            transition: opacity 1s ease;
+        }
+
+        h1 {
+            font-family: 'Cinzel', serif;
+            color: var(--border-gold);
+            letter-spacing: 5px;
+            text-shadow: 0 0 15px rgba(192, 160, 96, 0.4);
+            margin-bottom: 5px;
+            animation: pulseGlow 4s infinite ease-in-out;
+        }
+
+        /* 派系面板 */
+        .faction-info {
+            width: 100%; max-width: 1100px;
+            background: rgba(42, 10, 59, 0.6); 
+            border: 1px solid rgba(192, 160, 96, 0.3);
+            margin-bottom: 20px; padding: 15px;
+            font-size: 0.9em; border-radius: 4px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(2px);
+        }
+        .faction-info:hover { border-color: var(--drakken-glow); box-shadow: 0 0 20px rgba(157, 78, 221, 0.2); }
+        .faction-info summary { font-family: 'Cinzel', serif; color: var(--border-gold); cursor: pointer; outline: none; list-style: none; text-align: center; }
+        .faction-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; animation: fadeIn 0.5s ease-out; }
+        .faction-item b { color: var(--drakken-glow); display: block; margin-bottom: 5px; }
+
+        /* 按钮与过滤器 */
+        .filter-container { margin: 15px 0; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+        .filter-btn {
+            background: rgba(26, 26, 26, 0.8); color: #aaa; border: 1px solid #444;
+            padding: 5px 12px; font-family: 'Cinzel', serif; font-size: 0.75em;
+            cursor: pointer; transition: 0.3s;
+        }
+        .filter-btn:hover, .filter-btn.active { 
+            border-color: var(--drakken-green); color: var(--drakken-green); 
+            box-shadow: 0 0 8px rgba(57, 255, 20, 0.2); transform: translateY(-2px);
+        }
+
+        /* 控制栏 */
+        .controls { 
+            margin-bottom: 20px; 
+            display: flex; 
+            gap: 15px; 
+            flex-wrap: wrap; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        
+        .btn {
+            background: rgba(10, 10, 10, 0.6); color: var(--border-gold); border: 1px solid var(--border-gold);
+            padding: 8px 20px; cursor: pointer; font-family: 'Cinzel', serif; 
+            transition: all 0.3s; box-shadow: 0 0 5px rgba(0,0,0,0.5);
+            height: 38px; 
+            /* 修改点：改为 inline-flex 防止按钮独占一行 */
+            display: inline-flex; align-items: center; justify-content: center;
+        }
+        .btn:hover { background: var(--border-gold); color: #000; transform: scale(1.05); box-shadow: 0 0 15px var(--border-gold); }
+        .btn:active { transform: scale(0.95); }
+        
+        .btn-sync { border-color: var(--drakken-green); color: var(--drakken-green); }
+        .btn-sync:hover { background: var(--drakken-green); color: #000; box-shadow: 0 0 15px var(--drakken-green); }
+        
+        .btn-unsaved {
+            background: rgba(42, 0, 0, 0.8) !important;
+            border-color: var(--drakken-red) !important;
+            color: var(--drakken-red) !important;
+            animation: urgentPulse 2s infinite ease-in-out !important;
+        }
+        .btn-unsaved:hover { background: var(--drakken-red) !important; color: #fff !important; }
+
+        /* 编辑模式控制组 */
+        .admin-controls { 
+            display: none; 
+            gap: 15px; 
+            align-items: center; 
+        }
+        body.editing-active .admin-controls { display: flex; flex-wrap: wrap; justify-content: center; }
+        
+        .separator {
+            width: 1px;
+            height: 30px; 
+            background: rgba(255,255,255,0.2);
+            margin: 0 5px;
+            border-right: 1px solid rgba(0,0,0,0.5); 
+        }
+
+        .btn-toggle-edit { border-color: #555; color: #777; }
+        body.editing-active .btn-toggle-edit { border-color: var(--drakken-glow); color: var(--drakken-glow); background: rgba(42,10,59,0.3); }
+
+        /* 表格样式 */
+        .table-container {
+            width: 100%; max-width: 1100px;
+            background: rgba(10, 10, 10, 0.85); 
+            border: 1px solid var(--border-gold);
+            box-shadow: 0 0 30px rgba(0,0,0,0.8);
+            transition: box-shadow 0.3s;
+        }
+        .table-container:hover { box-shadow: 0 0 40px rgba(42, 10, 59, 0.5); }
+
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: var(--drakken-purple); font-family: 'Cinzel', serif; font-size: 0.9em; }
+        th { padding: 12px; color: #fff; text-align: left; border-bottom: 2px solid var(--border-gold); text-shadow: 0 0 2px #000; }
+        
+        tr { transition: background-color 0.2s; animation: fadeIn 0.4s ease-out forwards; opacity: 0; }
+        tr:hover td { background: rgba(157, 78, 221, 0.1); }
+
+        td { 
+            padding: 12px; border-bottom: 1px solid rgba(192, 160, 96, 0.2); 
+            font-size: 0.95em; color: var(--text-gray) !important; 
+        }
+        .name-cell { font-family: 'Cinzel', serif; color: #fff !important; font-weight: bold; text-shadow: 1px 1px 2px #000; }
+        .role-cell { color: var(--drakken-glow) !important; font-style: italic; }
+        .goal-cell { color: var(--drakken-green) !important; font-size: 0.9em; }
+
+        body.editing-active [contenteditable="true"]:hover { background: rgba(255,255,255,0.05); cursor: text; }
+        body.editing-active [contenteditable="true"]:focus { background: rgba(255,255,255,0.1); outline: none; border-bottom: 1px solid var(--drakken-green); }
+
+        th.action-col, td.action-col { display: none; }
+        body.editing-active th.action-col, body.editing-active td.action-col { display: table-cell; }
+
+        .portrait-cell img {
+            width: 55px; height: 55px; object-fit: cover;
+            border: 2px solid var(--drakken-glow); cursor: zoom-in;
+            background: #000; transition: transform 0.3s;
+        }
+        .portrait-cell img:hover { transform: scale(1.2) rotate(2deg); z-index: 10; position: relative; border-color: #fff; }
+
+        /* 2x2 操作网格 */
+        .action-grid {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 5px;
+            width: 80px; margin: 0 auto;
+        }
+        .action-btn {
+            background: rgba(10, 10, 10, 0.6);
+            border: 1px solid var(--border-gold); color: var(--border-gold);
+            padding: 0; height: 24px;
+            font-size: 12px; font-family: 'Cinzel', serif;
+            cursor: pointer; transition: all 0.2s; border-radius: 2px;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .action-btn:hover { background: var(--border-gold); color: #000; box-shadow: 0 0 5px var(--border-gold); }
+        
+        .btn-danger:hover {
+            background: var(--drakken-red); color: #fff;
+            border-color: var(--drakken-red); box-shadow: 0 0 8px var(--drakken-red);
+        }
+
+        /* 模态框 */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center;
+            backdrop-filter: blur(5px); animation: fadeIn 0.3s;
+        }
+        #zoomModal img { max-width: 80%; max-height: 80%; border: 3px solid var(--border-gold); box-shadow: 0 0 50px rgba(192, 160, 96, 0.4); animation: floatUp 0.3s; }
+        
+        .upload-panel {
+            background: var(--bg-dark); border: 2px solid var(--border-gold);
+            padding: 30px; width: 400px; text-align: center;
+            box-shadow: 0 0 30px var(--drakken-purple); animation: floatUp 0.4s;
+        }
+        .upload-area { border: 1px dashed var(--drakken-glow); padding: 20px; margin: 15px 0; color: var(--drakken-glow); font-size: 0.9em; cursor: pointer; }
+        .upload-area:hover { background: rgba(157, 78, 221, 0.1); }
+        
+        .url-input { width: 90%; padding: 8px; background: #111; border: 1px solid #444; color: #fff; margin-bottom: 10px; }
+
+        /* 修改点：弹窗底部按钮布局 */
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px; /* 按钮间距 */
+            margin-top: 20px;
+        }
+
+        /* 修改点：取消按钮的弱化样式 */
+        .btn-cancel {
+            background: transparent !important;
+            border-color: #444 !important;
+            color: #777 !important;
+            box-shadow: none !important;
+        }
+        .btn-cancel:hover {
+            border-color: #888 !important;
+            color: #ccc !important;
+            transform: scale(1.05);
+            background: rgba(255,255,255,0.05) !important;
+        }
+
+        #status { font-size: 0.8em; color: var(--drakken-glow); margin-bottom: 10px; height: 1.2em; text-shadow: 1px 1px 2px #000; animation: statusPulse 2s infinite; }
+        .hidden-row { display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>Drakkenheim NPC Registry</h1>
+    
+    <details class="faction-info">
+        <summary>点击查看五大派系目标速查</summary>
+        <div class="faction-grid">
+            <div class="faction-item"><b>白银骑士团</b>打击非法施法者与天火信众，净化污染水晶。</div>
+            <div class="faction-item"><b>覆影明灯</b>军队演变的救国组织，立志收复德拉肯海姆。</div>
+            <div class="faction-item"><b>紫晶学院</b>研究异变，收回失落的魔法资料与秘法。</div>
+            <div class="faction-item"><b>天火信众</b>崇尚陨石为圣物，认为融入黑暗才有光明。</div>
+            <div class="faction-item"><b>女王和他的兄弟们</b>盗匪集团，希望维持混乱以从中获利。</div>
+        </div>
+    </details>
+
+    <div id="status">感知到异质能量的流动...</div>
+
+    <div class="controls">
+        <!-- 基础控制 -->
+        <button class="btn btn-toggle-edit" onclick="toggleEditMode()" id="editToggleBtn">✎ 编辑模式</button>
+        <button class="btn" onclick="loadFromCloud()">↻ 拉取档案</button>
+        <button class="btn" onclick="exportJSON()">⬇ 导出备份</button>
+
+        <!-- 管理控制 -->
+        <div class="admin-controls">
+            <div class="separator"></div>
+            <button class="btn" onclick="addNewRow()">+ 新增 NPC</button>
+            <button class="btn btn-sync" id="save-btn" onclick="saveToCloud()">● 档案保存</button>
+            <button class="btn" onclick="document.getElementById('importFile').click()">⬆ 导入覆盖</button>
+        </div>
+    </div>
+
+    <input type="file" id="importFile" style="display:none" accept=".json" onchange="importJSON(this)">
+
+    <div class="filter-container">
+        <button class="filter-btn active" onclick="filterByRole('全部')">全部显示</button>
+        <button class="filter-btn" onclick="filterByRole('白银骑士团')">白银骑士团</button>
+        <button class="filter-btn" onclick="filterByRole('覆影明灯')">覆影明灯</button>
+        <button class="filter-btn" onclick="filterByRole('紫晶学院')">紫晶学院</button>
+        <button class="filter-btn" onclick="filterByRole('天火信众')">天火信众</button>
+        <button class="filter-btn" onclick="filterByRole('女王和他的兄弟们')">女王和他的兄弟们</button>
+    </div>
+
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th width="70">立绘</th>
+                    <th width="140">姓名</th>
+                    <th width="160">职位/派系</th>
+                    <th width="200">目标/动机</th>
+                    <th>备注</th>
+                    <th width="100" class="action-col">操作</th>
+                </tr>
+            </thead>
+            <tbody id="npcBody"></tbody>
+        </table>
+    </div>
+    <div id="bottom-anchor"></div>
+
+    <!-- 模态框保持不变 -->
+    <div id="zoomModal" class="modal-overlay" onclick="this.style.display='none'">
+        <img id="modalImg" src="">
+    </div>
+
+    <div id="uploadModal" class="modal-overlay">
+        <div class="upload-panel">
+            <h3>镜像幻影上传</h3>
+            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+                点击选择文件<br>或 Ctrl+V 粘贴图片
+            </div>
+            <input type="text" id="urlInput" class="url-input" placeholder="输入图片链接...">
+            
+            <!-- 修改点：新的按钮容器结构 -->
+            <div class="modal-actions">
+                <button class="btn" onclick="submitUrl()">确定</button>
+                <button class="btn btn-cancel" onclick="closeUploadModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    <input type="file" id="fileInput" style="display:none" accept="image/*">
+
+    <script>
+        const BIN_ID = '694660dc43b1c97be9fabafa';
+        const API_KEY = '$2a$10$XJ53rCMwsJ3xbBWXWROPieHdZvZnbtvrR8h61khdWQlaC.WvqXbC2';
+        const IMG_BB_KEY = '192ec7a9ecdec9b51ffed683da3842dc';
+        const ACCESS_PASSWORD = 'YXC233';
+
+        let npcData = [];
+        let isEditMode = false;
+        let hasUnsavedChanges = false;
+        let currentEditingIndex = -1;
+
+        window.onload = loadFromCloud;
+
+        document.addEventListener('paste', function(e) {
+            if (e.target.getAttribute('contenteditable')) {
+                e.preventDefault();
+                const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+                document.execCommand('insertText', false, text);
+            }
+            if (document.getElementById('uploadModal').style.display === 'flex') {
+                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+                for (let item of items) {
+                    if (item.type.indexOf("image") !== -1) {
+                        uploadFile(item.getAsFile());
+                    }
+                }
+            }
+        });
+
+        window.onbeforeunload = function(e) {
+            if (hasUnsavedChanges) {
+                e.preventDefault();
+                e.returnValue = ''; 
+                return '有未保存的更改，确定要离开吗？';
+            }
+        };
+
+        function setUnsavedState(isDirty) {
+            hasUnsavedChanges = isDirty;
+            const saveBtn = document.getElementById('save-btn');
+            
+            if (isDirty) {
+                saveBtn.classList.add('btn-unsaved');
+                saveBtn.innerHTML = "⚠ 变更未保存";
+                document.title = "* 档案未保存 - Drakkenheim";
+                showStatus("检测到时间线变动，请及时保存！");
+            } else {
+                saveBtn.classList.remove('btn-unsaved');
+                saveBtn.innerHTML = "● 档案保存";
+                document.title = "德拉肯海姆 NPC 档案录";
+                showStatus("时间线已稳固。");
+            }
+        }
+
+        function toggleEditMode() {
+            if (!isEditMode) {
+                const p = prompt("请输入 DM 密语以解除封印:");
+                if (p === ACCESS_PASSWORD) {
+                    isEditMode = true;
+                    document.body.classList.add('editing-active');
+                    document.getElementById('editToggleBtn').innerHTML = "👁 观察模式";
+                    document.getElementById('editToggleBtn').style.color = "var(--drakken-glow)";
+                    showStatus("管理权限已授予。");
+                } else {
+                    alert("密语错误，权限拒绝。");
+                    return;
+                }
+            } else {
+                isEditMode = false;
+                document.body.classList.remove('editing-active');
+                document.getElementById('editToggleBtn').innerHTML = "✎ 编辑模式";
+                document.getElementById('editToggleBtn').style.color = "";
+                showStatus("回归观察者视角。");
+            }
+            renderTable();
+        }
+
+        async function loadFromCloud() {
+            showStatus("正在从暗影界提取档案...");
+            try {
+                const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': API_KEY, 'X-Bin-Meta': false }
+                });
+                npcData = await res.json();
+                if (!Array.isArray(npcData)) npcData = [];
+                renderTable();
+                setUnsavedState(false);
+            } catch (err) { showStatus("同步失败：" + err); }
+        }
+
+        async function saveToCloud() {
+            const p = prompt("确认要将更改刻入圣物吗？(输入密语):");
+            if (p !== ACCESS_PASSWORD) { alert("密语错误。"); return; }
+
+            showStatus("正在写入...");
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                    body: JSON.stringify(npcData)
+                });
+                setUnsavedState(false);
+            } catch (err) { showStatus("保存失败。"); }
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById("npcBody");
+            tbody.innerHTML = '';
+            
+            const editableAttr = isEditMode ? 'contenteditable="true"' : '';
+
+            npcData.forEach((item, index) => {
+                const row = document.createElement('tr');
+                row.style.animationDelay = `${index * 0.03}s`; 
+                
+                let html = `
+                    <td class="portrait-cell">
+                        <img src="${item.img}" class="npc-img" onerror="this.src='https://via.placeholder.com/55?text=?'" onclick="zoomImg(this.src)">
+                    </td>
+                    <td ${editableAttr} class="name-cell" onblur="updateData(${index}, 'name', this.innerText)">${item.name}</td>
+                    <td ${editableAttr} class="role-cell" onblur="updateData(${index}, 'role', this.innerText)">${item.role}</td>
+                    <td ${editableAttr} class="goal-cell" onblur="updateData(${index}, 'goal', this.innerText)">${item.goal}</td>
+                    <td ${editableAttr} onblur="updateData(${index}, 'note', this.innerText)">${item.note}</td>
+                `;
+
+                html += `
+                    <td class="action-col">
+                        <div class="action-grid">
+                            <button class="action-btn" title="上移" onclick="moveRow(${index}, -1)">▲</button>
+                            <button class="action-btn" title="下移" onclick="moveRow(${index}, 1)">▼</button>
+                            <button class="action-btn" title="更换立绘" onclick="openUploadModal(${index})">
+                                <span style="font-size:10px;font-weight:bold;">换图</span>
+                            </button>
+                            <button class="action-btn btn-danger" title="删除条目" onclick="deleteRow(${index})">☠</button>
+                        </div>
+                    </td>
+                `;
+                
+                row.innerHTML = html;
+                tbody.appendChild(row);
+            });
+            
+            const activeFilter = document.querySelector('.filter-btn.active').innerText;
+            if(activeFilter !== '全部显示') filterByRole(activeFilter);
+        }
+
+        function updateData(index, field, value) {
+            const cleanValue = value.trim();
+            if (npcData[index][field] !== cleanValue) {
+                npcData[index][field] = cleanValue;
+                setUnsavedState(true);
+            }
+        }
+
+        function addNewRow() {
+            npcData.push({img: 'https://via.placeholder.com/150/2a0a3b/fff?text=?', name: '新角色', role: '职位', goal: '目标', note: ''});
+            renderTable();
+            setUnsavedState(true);
+            document.getElementById('bottom-anchor').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function deleteRow(index) {
+            if(confirm("确定要抹除这条记录吗？")) {
+                npcData.splice(index, 1);
+                renderTable();
+                setUnsavedState(true);
+            }
+        }
+
+        function moveRow(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex >= 0 && newIndex < npcData.length) {
+                [npcData[index], npcData[newIndex]] = [npcData[newIndex], npcData[index]];
+                renderTable();
+                setUnsavedState(true);
+            }
+        }
+
+        function openUploadModal(index) {
+            currentEditingIndex = index;
+            document.getElementById('uploadModal').style.display = 'flex';
+            document.getElementById('urlInput').value = '';
+        }
+        function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
+        
+        async function uploadFile(file) {
+            if (!file) return;
+            showStatus("正在上传图像...");
+            closeUploadModal();
+            const formData = new FormData();
+            formData.append("image", file);
+            try {
+                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, { method: "POST", body: formData });
+                const result = await res.json();
+                if (result.success) {
+                    npcData[currentEditingIndex].img = result.data.url;
+                    renderTable();
+                    setUnsavedState(true);
+                    showStatus("图像上传完成。");
+                }
+            } catch (err) { alert("上传失败。"); }
+        }
+
+        function submitUrl() {
+            const url = document.getElementById('urlInput').value.trim();
+            if (url) {
+                npcData[currentEditingIndex].img = url;
+                renderTable();
+                setUnsavedState(true);
+                closeUploadModal();
+            }
+        }
+
+        document.getElementById('fileInput').onchange = (e) => uploadFile(e.target.files[0]);
+
+        function zoomImg(src) {
+            document.getElementById('modalImg').src = src;
+            document.getElementById('zoomModal').style.display = 'flex';
+        }
+
+        function filterByRole(faction) {
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.toggle('active', btn.innerText === faction));
+            const rows = document.querySelectorAll("#npcBody tr");
+            rows.forEach(row => {
+                const roleText = row.cells[2].innerText;
+                row.classList.toggle('hidden-row', faction !== '全部' && faction !== '全部显示' && !roleText.includes(faction));
+            });
+        }
+
+        function exportJSON() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(npcData, null, 2));
+            const a = document.createElement('a');
+            a.href = dataStr;
+            a.download = `Drakkenheim_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+        }
+
+        function importJSON(input) {
+            const file = input.files[0];
+            if (!file) return;
+            if (!confirm("导入将覆盖当前未保存的修改，继续吗？")) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    npcData = JSON.parse(e.target.result);
+                    renderTable();
+                    setUnsavedState(true);
+                    showStatus("备份已加载 (请记得保存到云端)。");
+                } catch (err) { alert("文件格式错误"); }
+            };
+            reader.readAsText(file);
+            input.value = '';
+        }
+
+        function showStatus(msg) { 
+            const el = document.getElementById("status");
+            el.innerText = msg;
+            el.style.animation = 'none';
+            el.offsetHeight; 
+            el.style.animation = 'statusPulse 2s infinite';
+        }
+    </script>
+</body>
+</html>
