@@ -107,7 +107,6 @@
             padding: 8px 20px; cursor: pointer; font-family: 'Cinzel', serif; 
             transition: all 0.3s; box-shadow: 0 0 5px rgba(0,0,0,0.5);
             height: 38px; 
-            /* 修改点：改为 inline-flex 防止按钮独占一行 */
             display: inline-flex; align-items: center; justify-content: center;
         }
         .btn:hover { background: var(--border-gold); color: #000; transform: scale(1.05); box-shadow: 0 0 15px var(--border-gold); }
@@ -219,15 +218,13 @@
         
         .url-input { width: 90%; padding: 8px; background: #111; border: 1px solid #444; color: #fff; margin-bottom: 10px; }
 
-        /* 修改点：弹窗底部按钮布局 */
         .modal-actions {
             display: flex;
             justify-content: center;
-            gap: 15px; /* 按钮间距 */
+            gap: 15px; 
             margin-top: 20px;
         }
 
-        /* 修改点：取消按钮的弱化样式 */
         .btn-cancel {
             background: transparent !important;
             border-color: #444 !important;
@@ -305,7 +302,6 @@
     </div>
     <div id="bottom-anchor"></div>
 
-    <!-- 模态框保持不变 -->
     <div id="zoomModal" class="modal-overlay" onclick="this.style.display='none'">
         <img id="modalImg" src="">
     </div>
@@ -318,7 +314,6 @@
             </div>
             <input type="text" id="urlInput" class="url-input" placeholder="输入图片链接...">
             
-            <!-- 修改点：新的按钮容器结构 -->
             <div class="modal-actions">
                 <button class="btn" onclick="submitUrl()">确定</button>
                 <button class="btn btn-cancel" onclick="closeUploadModal()">取消</button>
@@ -482,7 +477,8 @@
         }
 
         function addNewRow() {
-            npcData.push({img: 'https://via.placeholder.com/150/2a0a3b/fff?text=?', name: '新角色', role: '职位', goal: '目标', note: ''});
+            // 已修改：使用指定的通用立绘链接
+            npcData.push({img: 'https://i.ibb.co/mFr8QwJm/image.png', name: '新角色', role: '职位', goal: '目标', note: ''});
             renderTable();
             setUnsavedState(true);
             document.getElementById('bottom-anchor').scrollIntoView({ behavior: 'smooth' });
@@ -512,13 +508,62 @@
         }
         function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
         
+        // 新增：WebP 压缩函数
+        function compressImage(file) {
+            return new Promise((resolve) => {
+                if (!file.type.match(/image.*/)) {
+                    resolve(file);
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const maxDim = 1920; 
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        if (width > height && width > maxDim) {
+                            height *= maxDim / width;
+                            width = maxDim;
+                        } else if (height > maxDim) {
+                            width *= maxDim / height;
+                            height = maxDim;
+                        }
+
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        
+                        // 清除画布背景以支持透明度
+                        ctx.clearRect(0, 0, width, height);
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        canvas.toBlob((blob) => {
+                            // 导出为 WebP, 75% 质量
+                            resolve(blob || file);
+                        }, 'image/webp', 0.75);
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 修改后的上传函数
         async function uploadFile(file) {
             if (!file) return;
-            showStatus("正在上传图像...");
+            showStatus("正在施展压缩咒文并上传...");
             closeUploadModal();
-            const formData = new FormData();
-            formData.append("image", file);
+            
             try {
+                // 压缩步骤
+                const compressedFile = await compressImage(file);
+
+                const formData = new FormData();
+                formData.append("image", compressedFile);
+                
                 const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, { method: "POST", body: formData });
                 const result = await res.json();
                 if (result.success) {
@@ -527,7 +572,10 @@
                     setUnsavedState(true);
                     showStatus("图像上传完成。");
                 }
-            } catch (err) { alert("上传失败。"); }
+            } catch (err) { 
+                console.error(err);
+                showStatus("上传失败。"); 
+            }
         }
 
         function submitUrl() {
