@@ -1,3 +1,5 @@
+--- START OF FILE index (1).html ---
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -424,22 +426,59 @@
         }
         function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
 
+        /* --- 新增图片预处理函数 --- */
+        async function processImage(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                // 包装成 File 对象，指定文件名和类型为 webp
+                                const processedFile = new File([blob], "upload.webp", { type: "image/webp" });
+                                resolve(processedFile);
+                            } else {
+                                reject(new Error("Canvas conversion failed"));
+                            }
+                        }, 'image/webp', 0.8); // 转换为 webp，压缩质量 0.8
+                    };
+                    img.onerror = reject;
+                };
+                reader.onerror = reject;
+            });
+        }
+
         async function uploadFile(file) {
             if (!file) return;
-            showStatus("上传中...");
+            showStatus("正在炼化幻象(压缩中)...");
             closeUploadModal();
             try {
+                // 执行压缩和 WebP 转换
+                const processedFile = await processImage(file);
+                
                 const formData = new FormData();
-                formData.append("image", file);
+                formData.append("image", processedFile);
+                
                 const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, { method: "POST", body: formData });
                 const result = await res.json();
                 if (result.success) {
                     npcData[currentEditingIndex].img = result.data.url;
                     renderTable();
                     setUnsavedState(true);
-                    showStatus("上传成功。");
+                    showStatus("上传成功(WebP)。");
                 }
-            } catch (err) { showStatus("上传失败。"); }
+            } catch (err) { 
+                console.error(err);
+                showStatus("上传或处理失败。"); 
+            }
         }
 
         function submitUrl() {
