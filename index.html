@@ -1,5 +1,3 @@
---- START OF FILE index (1).html ---
-
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -79,7 +77,7 @@
         .faction-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-top: 15px; }
         .faction-item b { color: var(--drakken-glow); display: block; margin-bottom: 5px; }
 
-        /* --- 新增：悬浮控制面板 --- */
+        /* --- 悬浮控制面板 --- */
         .sticky-header {
             position: sticky;
             top: 0;
@@ -197,6 +195,14 @@
         .url-input { width: 90%; padding: 8px; background: #111; border: 1px solid #444; color: #fff; margin-bottom: 10px; }
 
         .hidden-row { display: none; }
+
+        /* 名词记录弹窗专有样式 */
+        .noun-panel { width: 600px; max-width: 90vw; }
+        .noun-textarea {
+            width: 100%; height: 350px; background: #111; color: var(--text-gray);
+            border: 1px solid var(--border-gold); padding: 12px; font-family: 'EB Garamond', serif;
+            font-size: 1.1em; line-height: 1.5; resize: none; margin-bottom: 15px;
+        }
     </style>
 </head>
 <body>
@@ -225,6 +231,7 @@
 
             <div class="admin-controls">
                 <div class="separator"></div>
+                <button class="btn" onclick="openNounModal()">📖 名词记录</button>
                 <button class="btn" onclick="addNewRow()">+ 新增 NPC</button>
                 <button class="btn btn-sync" id="save-btn" onclick="saveToCloud()">● 档案保存</button>
                 <button class="btn" onclick="document.getElementById('importFile').click()">⬆ 导入覆盖</button>
@@ -261,10 +268,12 @@
     </div>
     <div id="bottom-anchor"></div>
 
+    <!-- 缩放模态框 -->
     <div id="zoomModal" class="modal-overlay" onclick="this.style.display='none'">
         <img id="modalImg" src="">
     </div>
 
+    <!-- 上传模态框 -->
     <div id="uploadModal" class="modal-overlay">
         <div class="upload-panel">
             <h3>镜像幻影上传</h3>
@@ -276,6 +285,19 @@
             </div>
         </div>
     </div>
+
+    <!-- 名词记录模态框 -->
+    <div id="nounModal" class="modal-overlay">
+        <div class="upload-panel noun-panel">
+            <h3>团内名词记录</h3>
+            <textarea id="nounTextarea" class="noun-textarea" placeholder="在此记录特有名词、黑话、或者世界观设定..."></textarea>
+            <div style="display:flex; justify-content: center; gap:10px;">
+                <button class="btn" onclick="saveNounRecords()">确定</button>
+                <button class="btn" style="border-color:#555; color:#777;" onclick="closeNounModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <input type="file" id="fileInput" style="display:none" accept="image/*">
 
     <script>
@@ -285,6 +307,7 @@
         const ACCESS_PASSWORD = '781674';
 
         let npcData = [];
+        let nounRecords = ""; // 新增：存储名词记录内容
         let isEditMode = false;
         let hasUnsavedChanges = false;
         let currentEditingIndex = -1;
@@ -344,7 +367,17 @@
                 const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
                     headers: { 'X-Master-Key': API_KEY, 'X-Bin-Meta': false }
                 });
-                npcData = await res.json();
+                const data = await res.json();
+                
+                // 兼容旧的数组结构和新的复合结构
+                if (data.npcs) {
+                    npcData = data.npcs;
+                    nounRecords = data.nouns || "";
+                } else {
+                    npcData = data;
+                    nounRecords = "";
+                }
+                
                 renderTable();
                 setUnsavedState(false);
                 showStatus("档案已同步。");
@@ -354,11 +387,18 @@
         async function saveToCloud() {
             if (prompt("确认刻入圣物吗？(输入密语):") !== ACCESS_PASSWORD) return;
             showStatus("正在写入...");
+            
+            // 构造上传的数据体
+            const payload = {
+                npcs: npcData,
+                nouns: nounRecords
+            };
+
             try {
                 await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
-                    body: JSON.stringify(npcData)
+                    body: JSON.stringify(payload)
                 });
                 setUnsavedState(false);
                 showStatus("时间线已稳固。");
@@ -426,7 +466,23 @@
         }
         function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
 
-        /* --- 新增图片预处理函数 --- */
+        // 名词记录弹窗逻辑
+        function openNounModal() {
+            document.getElementById('nounTextarea').value = nounRecords;
+            document.getElementById('nounModal').style.display = 'flex';
+        }
+        function closeNounModal() {
+            document.getElementById('nounModal').style.display = 'none';
+        }
+        function saveNounRecords() {
+            const newValue = document.getElementById('nounTextarea').value;
+            if (nounRecords !== newValue) {
+                nounRecords = newValue;
+                setUnsavedState(true);
+            }
+            closeNounModal();
+        }
+
         async function processImage(file) {
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -442,13 +498,12 @@
                         ctx.drawImage(img, 0, 0);
                         canvas.toBlob((blob) => {
                             if (blob) {
-                                // 包装成 File 对象，指定文件名和类型为 webp
                                 const processedFile = new File([blob], "upload.webp", { type: "image/webp" });
                                 resolve(processedFile);
                             } else {
                                 reject(new Error("Canvas conversion failed"));
                             }
-                        }, 'image/webp', 0.8); // 转换为 webp，压缩质量 0.8
+                        }, 'image/webp', 0.8);
                     };
                     img.onerror = reject;
                 };
@@ -461,9 +516,7 @@
             showStatus("正在炼化幻象(压缩中)...");
             closeUploadModal();
             try {
-                // 执行压缩和 WebP 转换
                 const processedFile = await processImage(file);
-                
                 const formData = new FormData();
                 formData.append("image", processedFile);
                 
@@ -506,7 +559,8 @@
         }
 
         function exportJSON() {
-            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(npcData, null, 2));
+            const payload = { npcs: npcData, nouns: nounRecords };
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(payload, null, 2));
             const a = document.createElement('a');
             a.href = dataStr;
             a.download = `Drakkenheim_${new Date().toISOString().split('T')[0]}.json`;
@@ -517,7 +571,14 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 try {
-                    npcData = JSON.parse(e.target.result);
+                    const data = JSON.parse(e.target.result);
+                    if (data.npcs) {
+                        npcData = data.npcs;
+                        nounRecords = data.nouns || "";
+                    } else {
+                        npcData = data;
+                        nounRecords = "";
+                    }
                     renderTable(); setUnsavedState(true); showStatus("备份已导入。");
                 } catch (err) { alert("格式错误"); }
             };
