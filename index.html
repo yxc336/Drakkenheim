@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>德拉肯海姆 NPC 档案录</title>
     <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=EB+Garamond:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+    <!-- FreeImage.host 图床插件 -->
+    <script async src="https://freeimage.host/sdk/pup.js" data-url="https://freeimage.host/upload" data-auto-insert="direct-links"></script>
     <style>
         :root {
             --drakken-purple: #2a0a3b;
@@ -35,7 +37,7 @@
             background-color: var(--bg-dark);
             color: var(--text-gray);
             font-family: 'EB Garamond', serif;
-            margin: 0; padding: 0 20px 40px 20px; /* 调整了底部边距 */
+            margin: 0; padding: 0 20px 40px 20px;
             display: flex; flex-direction: column; align-items: center;
             min-height: 100vh;
             position: relative;
@@ -153,7 +155,7 @@
         }
 
         table { width: 100%; border-collapse: collapse; }
-        thead { background: var(--drakken-purple); font-family: 'Cinzel', serif; font-size: 0.9em; position: sticky; top: 110px; z-index: 10; } /* 表头也保持悬浮，在控制栏下方 */
+        thead { background: var(--drakken-purple); font-family: 'Cinzel', serif; font-size: 0.9em; position: sticky; top: 110px; z-index: 10; }
         th { padding: 12px; color: #fff; text-align: left; border-bottom: 2px solid var(--border-gold); }
         
         tr { animation: fadeIn 0.4s ease-out forwards; }
@@ -191,8 +193,7 @@
         #zoomModal img { max-width: 80%; max-height: 80%; border: 3px solid var(--border-gold); }
         
         .upload-panel { background: var(--bg-dark); border: 2px solid var(--border-gold); padding: 30px; width: 400px; text-align: center; }
-        .upload-area { border: 1px dashed var(--drakken-glow); padding: 20px; margin: 15px 0; color: var(--drakken-glow); cursor: pointer; }
-        .url-input { width: 90%; padding: 8px; background: #111; border: 1px solid #444; color: #fff; margin-bottom: 10px; }
+        .url-input { width: 100%; padding: 8px; background: #111; border: 1px solid #444; color: #fff; margin-bottom: 15px; }
 
         .hidden-row { display: none; }
 
@@ -273,12 +274,14 @@
         <img id="modalImg" src="">
     </div>
 
-    <!-- 上传模态框 -->
+    <!-- 精简后的换图模态框 -->
     <div id="uploadModal" class="modal-overlay">
         <div class="upload-panel">
-            <h3>镜像幻影上传</h3>
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">点击选择或 Ctrl+V 粘贴</div>
-            <input type="text" id="urlInput" class="url-input" placeholder="输入图片链接...">
+            <h3 style="font-family:'Cinzel',serif; color:var(--border-gold); margin-top:0;">镜像幻影上传</h3>
+            <div style="margin-bottom: 15px;">
+                <button type="button" class="btn" data-chevereto-pup-trigger data-target="#urlInput">FreeImage 上传</button>
+            </div>
+            <input type="text" id="urlInput" class="url-input" placeholder="等待插件回填直链，或手动粘贴图片链接...">
             <div style="display:flex; justify-content: center; gap:10px;">
                 <button class="btn" onclick="submitUrl()">确定</button>
                 <button class="btn" style="border-color:#555; color:#777;" onclick="closeUploadModal()">取消</button>
@@ -289,7 +292,7 @@
     <!-- 名词记录模态框 -->
     <div id="nounModal" class="modal-overlay">
         <div class="upload-panel noun-panel">
-            <h3>团内名词记录</h3>
+            <h3 style="font-family:'Cinzel',serif; color:var(--border-gold); margin-top:0;">团内名词记录</h3>
             <textarea id="nounTextarea" class="noun-textarea" placeholder="在此记录特有名词、黑话、或者世界观设定..."></textarea>
             <div style="display:flex; justify-content: center; gap:10px;">
                 <button class="btn" onclick="saveNounRecords()">确定</button>
@@ -298,33 +301,28 @@
         </div>
     </div>
 
-    <input type="file" id="fileInput" style="display:none" accept="image/*">
-
     <script>
         const BIN_ID = '694660dc43b1c97be9fabafa';
         const API_KEY = '$2a$10$XJ53rCMwsJ3xbBWXWROPieHdZvZnbtvrR8h61khdWQlaC.WvqXbC2';
-        const IMG_BB_KEY = '192ec7a9ecdec9b51ffed683da3842dc';
         const ACCESS_PASSWORD = '781674';
 
         let npcData = [];
-        let nounRecords = ""; // 新增：存储名词记录内容
+        let nounRecords = "";
         let isEditMode = false;
         let hasUnsavedChanges = false;
         let currentEditingIndex = -1;
 
-        window.onload = loadFromCloud;
+        window.onload = function() {
+            loadFromCloud();
+            initUrlAutoCapture();
+        };
 
+        // 仅保留 contenteditable 纯文本过滤
         document.addEventListener('paste', function(e) {
             if (e.target.getAttribute('contenteditable')) {
                 e.preventDefault();
                 const text = (e.originalEvent || e).clipboardData.getData('text/plain');
                 document.execCommand('insertText', false, text);
-            }
-            if (document.getElementById('uploadModal').style.display === 'flex') {
-                const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-                for (let item of items) {
-                    if (item.type.indexOf("image") !== -1) uploadFile(item.getAsFile());
-                }
             }
         });
 
@@ -369,7 +367,6 @@
                 });
                 const data = await res.json();
                 
-                // 兼容旧的数组结构和新的复合结构
                 if (data.npcs) {
                     npcData = data.npcs;
                     nounRecords = data.nouns || "";
@@ -388,7 +385,6 @@
             if (prompt("确认刻入圣物吗？(输入密语):") !== ACCESS_PASSWORD) return;
             showStatus("正在写入...");
             
-            // 构造上传的数据体
             const payload = {
                 npcs: npcData,
                 nouns: nounRecords
@@ -429,8 +425,8 @@
                 `;
                 tbody.appendChild(row);
             });
-            const activeFilter = document.querySelector('.filter-btn.active').innerText;
-            if(activeFilter !== '全部显示') filterByRole(activeFilter);
+            const activeBtn = document.querySelector('.filter-btn.active');
+            if (activeBtn && activeBtn.innerText !== '全部显示') filterByRole(activeBtn.innerText);
         }
 
         function updateData(index, field, value) {
@@ -462,9 +458,84 @@
 
         function openUploadModal(index) {
             currentEditingIndex = index;
+            document.getElementById('urlInput').value = '';
             document.getElementById('uploadModal').style.display = 'flex';
         }
-        function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
+
+        function closeUploadModal() {
+            document.getElementById('uploadModal').style.display = 'none';
+        }
+
+        // --- 直链清洗与闭环逻辑 ---
+        function extractCleanImageUrl(rawText) {
+            if (!rawText || typeof rawText !== 'string') return '';
+            const text = rawText.trim();
+            // 优先匹配带常见图片后缀的 HTTP/HTTPS 链接
+            const imgMatch = text.match(/https?:\/\/[^\s"'<>\(\)]+?\.(?:jpg|jpeg|png|webp|gif)(?:\?[^\s"'<>\(\)]*)?/i);
+            if (imgMatch) return imgMatch[0];
+            // 若无后缀则提取纯标准 HTTP/HTTPS 链接
+            const urlMatch = text.match(/https?:\/\/[^\s"'<>\(\)]+/i);
+            if (urlMatch) return urlMatch[0];
+            return '';
+        }
+
+        function applyCleanImageUrl(rawText) {
+            const cleanUrl = extractCleanImageUrl(rawText);
+            if (cleanUrl && currentEditingIndex >= 0 && currentEditingIndex < npcData.length) {
+                npcData[currentEditingIndex].img = cleanUrl;
+                renderTable();
+                setUnsavedState(true);
+                closeUploadModal();
+                showStatus("立绘已更新。");
+                return true;
+            }
+            return false;
+        }
+
+        function submitUrl() {
+            const rawVal = document.getElementById('urlInput').value;
+            const success = applyCleanImageUrl(rawVal);
+            if (!success) {
+                alert("未能提取到有效的图片直链，请检查输入格式。");
+            }
+        }
+
+        function initUrlAutoCapture() {
+            const inputEl = document.getElementById('urlInput');
+
+            // 监听插件或用户直接将文本写入 input 框
+            ['input', 'change'].forEach(eventType => {
+                inputEl.addEventListener(eventType, function() {
+                    if (this.value) {
+                        applyCleanImageUrl(this.value);
+                    }
+                });
+            });
+
+            // 跨域监听 FreeImage / pup.js 回传的消息
+            window.addEventListener('message', function(event) {
+                let candidateText = '';
+                if (typeof event.data === 'string') {
+                    candidateText = event.data;
+                } else if (event.data && typeof event.data === 'object') {
+                    if (typeof event.data.message === 'string') {
+                        candidateText = event.data.message;
+                    } else {
+                        try {
+                            candidateText = JSON.stringify(event.data);
+                        } catch (e) {}
+                    }
+                }
+
+                if (candidateText) {
+                    const cleanUrl = extractCleanImageUrl(candidateText);
+                    if (cleanUrl) {
+                        inputEl.value = cleanUrl;
+                        applyCleanImageUrl(cleanUrl);
+                    }
+                }
+            });
+        }
 
         // 名词记录弹窗逻辑
         function openNounModal() {
@@ -482,67 +553,6 @@
             }
             closeNounModal();
         }
-
-        async function processImage(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.readAsDataURL(file);
-                reader.onload = (event) => {
-                    const img = new Image();
-                    img.src = event.target.result;
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width;
-                        canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-                        canvas.toBlob((blob) => {
-                            if (blob) {
-                                const processedFile = new File([blob], "upload.webp", { type: "image/webp" });
-                                resolve(processedFile);
-                            } else {
-                                reject(new Error("Canvas conversion failed"));
-                            }
-                        }, 'image/webp', 0.8);
-                    };
-                    img.onerror = reject;
-                };
-                reader.onerror = reject;
-            });
-        }
-
-        async function uploadFile(file) {
-            if (!file) return;
-            showStatus("正在炼化幻象(压缩中)...");
-            closeUploadModal();
-            try {
-                const processedFile = await processImage(file);
-                const formData = new FormData();
-                formData.append("image", processedFile);
-                
-                const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMG_BB_KEY}`, { method: "POST", body: formData });
-                const result = await res.json();
-                if (result.success) {
-                    npcData[currentEditingIndex].img = result.data.url;
-                    renderTable();
-                    setUnsavedState(true);
-                    showStatus("上传成功(WebP)。");
-                }
-            } catch (err) { 
-                console.error(err);
-                showStatus("上传或处理失败。"); 
-            }
-        }
-
-        function submitUrl() {
-            const url = document.getElementById('urlInput').value.trim();
-            if (url) {
-                npcData[currentEditingIndex].img = url;
-                renderTable(); setUnsavedState(true); closeUploadModal();
-            }
-        }
-
-        document.getElementById('fileInput').onchange = (e) => uploadFile(e.target.files[0]);
 
         function zoomImg(src) {
             document.getElementById('modalImg').src = src;
